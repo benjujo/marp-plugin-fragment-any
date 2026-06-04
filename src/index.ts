@@ -15,6 +15,12 @@
  * Fragment order follows document position and shares the counter with * and 1) lists.
  */
 
+// Marpit converts <!-- ... --> blocks to marpit_comment tokens and stores only
+// the inner content (without the <!-- --> delimiters). Match that inner text.
+const FRAGMENT_INNER_RE = /^fragment((?:\s+[\w-]+:[^\s>]*)*)\s*$/
+
+// Fallback for non-Marpit markdown-it instances where the full HTML comment
+// is still an html_block token.
 const FRAGMENT_COMMENT_RE = /<!--\s*fragment((?:\s+[\w-]+:[^\s>]*)*)\s*-->/
 
 const BLOCK_OPEN_TYPES = new Set([
@@ -33,15 +39,24 @@ const SELF_CLOSING_BLOCK_TYPES = new Set([
   'html_block',
 ])
 
+function buildStyle(propStr: string): string {
+  if (!propStr.trim()) return ''
+  const props = propStr.trim().split(/\s+/).filter((p) => p.includes(':'))
+  return ['position:absolute', ...props].join(';')
+}
+
+// For marpit_comment tokens — content is already the inner text without <!-- -->
+function parseInnerContent(content: string): string | null {
+  const match = FRAGMENT_INNER_RE.exec(content.trim())
+  if (!match) return null
+  return buildStyle(match[1])
+}
+
+// Fallback for plain html_block tokens (non-Marpit environments)
 function parseComment(content: string): string | null {
   const match = FRAGMENT_COMMENT_RE.exec(content.trim())
   if (!match) return null
-
-  const propStr = match[1].trim()
-  if (!propStr) return ''
-
-  const props = propStr.split(/\s+/).filter((p) => p.includes(':'))
-  return ['position:absolute', ...props].join(';')
+  return buildStyle(match[1])
 }
 
 function appendStyle(token: any, style: string) {
@@ -75,12 +90,14 @@ export function fragmentAny(md: any): void {
           }
         }
 
-        if (token.type === 'html_block') {
+        if (token.type === 'marpit_comment') {
+          // Marpit path: content is the inner text of the comment (no <!-- -->)
+          const style = parseInnerContent(token.content)
+          if (style !== null) { pendingStyle = style; continue }
+        } else if (token.type === 'html_block') {
+          // Fallback: plain markdown-it where comment is still an html_block
           const style = parseComment(token.content)
-          if (style !== null) {
-            pendingStyle = style
-            continue
-          }
+          if (style !== null) { pendingStyle = style; continue }
         }
 
         if (

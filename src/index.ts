@@ -1,11 +1,7 @@
-import { marpitPlugin } from '@marp-team/marpit'
-import type MarkdownIt from 'markdown-it'
-
 /**
  * Marpit plugin: fragment any block element via <!-- fragment --> comments.
  *
- * Usage:
- *   import { fragmentAny } from 'marp-plugin-fragment-any'
+ * Usage with any Marpit-compatible instance:
  *   new Marp().use(fragmentAny)
  *
  * Syntax in markdown:
@@ -53,9 +49,13 @@ function appendStyle(token: any, style: string) {
   token.attrSet('style', existing ? `${existing};${style}` : style)
 }
 
-export const fragmentAny = marpitPlugin(function fragmentAny(md: MarkdownIt) {
+export function fragmentAny(md: any): void {
+  if (!md.marpit) {
+    throw new Error('marp-plugin-fragment-any requires a Marpit-compatible instance')
+  }
+
   // Runs before marpit_apply_fragment so tokens get picked up by marpit's numbering pass.
-  ;(md as any).core.ruler.before(
+  md.core.ruler.before(
     'marpit_apply_fragment',
     'marpit_fragment_any',
     (state: any) => {
@@ -102,7 +102,7 @@ export const fragmentAny = marpitPlugin(function fragmentAny(md: MarkdownIt) {
 
   // Runs after marpit_apply_fragment to apply stored inline styles without
   // interfering with marpit's fragment counter logic.
-  ;(md as any).core.ruler.after(
+  md.core.ruler.after(
     'marpit_apply_fragment',
     'marpit_fragment_any_style',
     (state: any) => {
@@ -114,4 +114,4 @@ export const fragmentAny = marpitPlugin(function fragmentAny(md: MarkdownIt) {
       }
     }
   )
-})
+}

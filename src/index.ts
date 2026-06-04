@@ -108,7 +108,18 @@ export function fragmentAny(md: any): void {
     (state: any) => {
       if (state.inlineMode) return
       for (const token of state.tokens) {
-        if (token.meta?.marpitFragmentStyle) {
+        if (token.type === 'html_block') {
+          // html_block renders raw HTML — attrSet never reaches the output.
+          // Inject data-marpit-fragment (and any position style) into the first tag.
+          const fragmentNum = token.attrGet('data-marpit-fragment')
+          const fragmentStyle = token.meta?.marpitFragmentStyle
+          if (fragmentNum !== null || fragmentStyle) {
+            let inject = ''
+            if (fragmentNum !== null) inject += ` data-marpit-fragment="${fragmentNum}"`
+            if (fragmentStyle) inject += ` style="${fragmentStyle}"`
+            token.content = token.content.replace(/(<[A-Za-z][^>]*)(>)/, `$1${inject}$2`)
+          }
+        } else if (token.meta?.marpitFragmentStyle) {
           appendStyle(token, token.meta.marpitFragmentStyle)
         }
       }
